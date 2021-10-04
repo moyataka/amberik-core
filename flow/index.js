@@ -6,10 +6,6 @@ const lens = require('../lens')
 const lensEvent = require('../lens/event')
 const { bot } = require('../configs')
 
-const spec_dir = `../spec/${bot.spec_dir}`
-const root_flow = require(`${spec_dir}`)
-const templates = require(`${spec_dir}/templates`)
-
 const flow_debugger = {
 	name: 'debugger',
 	pipe: [
@@ -47,7 +43,7 @@ const genSharedMemoryId = (event) => {
 	return _id
 }
 
-const flow = (memo) => builder.buildFlow$(
+const flow = (memo, root_flow, templates) => builder.buildFlow$(
 	{
 		name: 'pre-root',
 		sub: {
@@ -108,10 +104,10 @@ const flow = (memo) => builder.buildFlow$(
 )
 
 module.exports = {
-	initFlow$: (memo) => {
+	initFlow$: (memo, root_flow, templates) => {
 		return () => 
 			builder.withEffect$(
 				memo,
-			)(flow(memo))
+			)(flow(memo, root_flow, templates))
 	}
 }

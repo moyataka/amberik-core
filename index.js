@@ -1,5 +1,4 @@
 const R = require('ramda')
-const axios = require('axios')
 const { from, throwError, iif, of, Subject, forkJoin } = require('rxjs')
 const { map, filter, defaultIfEmpty, tap, mergeMap, retryWhen } = require('rxjs/operators')
 const express = require('express')
@@ -11,49 +10,25 @@ const Memo = require('./memo')
 const parser = require('./parser')
 const pusher = require('./pusher')
 const flow = require('./flow')
+const channel = require('./channel')
+const { getBearerToken } = require('./req')
+
+const root_flow = require(`./spec/examples`)
+const templates = require(`./spec/examples/templates`)
 
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
 const memo = Memo(configs.getMemo())
+const flow$ = flow.initFlow$(memo, root_flow, templates)()
+
 const line$ = new Subject()
-const flow$ = flow.initFlow$(memo)()
-
-const filterLineEmptyEvent = R.compose(
-	R.ifElse(
-		R.isEmpty,
-		R.compose(
-			R.F,
-			R.tap(() => console.log('got empty events')),
-		),
-		R.T,
-	),
-	R.prop('events'),
-)
-
-line$.pipe(
-	filter(filterLineEmptyEvent),
-	mergeMap(parser.line$),
-	mergeMap(flow$),
-	mergeMap((data) => forkJoin([
-		pusher.send$(data),
-		memo.setMemory$(data),
-	])),
-	retryWhen(e => e.pipe(tap(console.error))),
-).subscribe()
+channel.subscribe.line(line$, flow$, pusher, memo)
 
 app.post('/', (req, res) => {
 	line$.next(req.body)
 	res.send({})
 })
-
-const getBearerToken = (req) => {
-	return R.compose(
-			R.nth(1),
-			R.split('Bearer '),
-			R.defaultTo('Bearer '),
-		)(req.get('Authorization'))
-}
 
 app.post('/multicast', (req, res) => {
 	of(req.body)
@@ -93,4 +68,4 @@ app.get('/healthz', (req, res) => {
 	res.send('ok')
 })
 
-app.listen(3000, () => console.log('webhook start!'))
+app.listen(5577, () => console.log('webhook start!'))
